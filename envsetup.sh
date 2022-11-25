@@ -7,7 +7,6 @@ function build_usage()
     build bootloader    - only build bootloader
     build buildroot     - only build buildroot
     build kernel        - only build kernel
-    build qt        	- build buildroot and Qt
     build clean         - clean all
     build distclean     - distclean all
 "
@@ -36,7 +35,6 @@ function build_help()
     cdts                - Changes directory to the dts.
     ckernel             - Changes directory to the kernel
     cout                - Changes directory to the board's output
-    cauto               - Changes directory to the auto
 "
     build_usage
     pack_usage
@@ -58,21 +56,6 @@ function load_config()
 function croot()
 {
 	cd $LICHEE_TOP_DIR
-}
-
-function cauto()
-{
-	cd $LICHEE_TOP_DIR/platform/framework/auto
-}
-
-function csdk_demo()
-{
-	cd $LICHEE_TOP_DIR/platform/framework/auto/sdk_demo
-}
-
-function csdk_lib()
-{
-	cd $LICHEE_TOP_DIR/platform/framework/auto/sdk_lib
 }
 
 function ckernel()
@@ -207,9 +190,6 @@ function build()
 	elif [ "x$mode" == "xbuildroot" ]; then
 		./build.sh buildroot
 		[ $? -ne 0 ] && return 1
-	elif [ "x$mode" == "xqt" ]; then
-		./build.sh qt
-		[ $? -ne 0 ] && return 1
 	elif [ "x$mode" == "xdistclean" ]; then
 		./build.sh distclean
 		[ $? -ne 0 ] && return 1
@@ -228,12 +208,6 @@ function build()
 if [ ! -f build/envsetup.sh ] || [ ! -f build.sh ]; then
 	echo "MUST do this in LICHEE_TOP_DIR."
 else
-    if [ ! -f .buildconfig ]; then
 	./build.sh config
-    fi
-    
 	export LICHEE_TOP_DIR=$(pwd)
-    . $LICHEE_TOP_DIR/.buildconfig
-	build_help
-    echo "run envsetup finish."
 fi

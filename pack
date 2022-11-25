@@ -829,9 +829,35 @@ function do_common()
 		update_uboot -no_merge u-boot.fex sys_config.bin > /dev/null
 	fi
 	update_fes1  fes1.fex           sys_config.bin > /dev/null
+	if [ -f ${LICHEE_TOOLS_DIR}/pack/pctools/linux/mod_update/update_sboot ];then
+		update_sboot sboot.bin  sys_config.bin
+		if [ $? -ne 0 ]
+		then
+			pack_error "update sboot run error"
+			exit 1
+		fi
+	fi
 	fsbuild      boot-resource.ini  split_xxxx.fex > /dev/null
 
 	if [ -f boot_package.cfg ]; then
+		if [ "x$LINUX_DTBO_FILE" = "x" ]; then
+			echo "do not set LINUX_DTBO_FILE"
+			line_num=`sed -n -e "/default.dtbo/=" boot_package.cfg`
+			if [ "x$line_num" != "x" ]; then
+				sed -i "$line_num s/^/;/g" boot_package.cfg
+			fi
+		else
+			if [ -f $LINUX_DTBO_FILE ]
+			then
+				sed -i "s/default.dtbo/$LINUX_DTBO_FILE/g" boot_package.cfg
+			else
+				line_num=`sed -n -e "/default.dtbo/=" boot_package.cfg`
+				if [ "x$line_num" != "x" ]; then
+					sed -i "$line_num s/^/;/g" boot_package.cfg
+				fi
+			fi
+		fi
+
 			echo "pack boot package"
 			busybox unix2dos boot_package.cfg
 			dragonsecboot -pack boot_package.cfg
@@ -866,14 +892,6 @@ function do_common()
 	if [ "x${PACK_SIGNFEL}" = "x${FLAGS_TRUE}" ]; then
 		do_signature_fel
 	fi
-}
-
-function showImageSize()
-{
-	echo '----------image is at----------'
-	echo -e '\033[0;31;1m'
-	echo "size:$5  ${LICHEE_OUT_DIR}/${IMG_NAME}"
-	echo -e '\033[0m'
 }
 
 function do_finish()
@@ -932,7 +950,10 @@ function do_finish()
 		if [ $? -eq 0 ]; then
 		if [ -e ${IMG_NAME} ]; then
 			mv ${IMG_NAME} $LICHEE_OUT_DIR/${IMG_NAME}
-			showImageSize `ls -alh ${LICHEE_OUT_DIR}/${IMG_NAME}`
+			echo '----------image is at----------'
+			echo -e '\033[0;31;1m'
+			echo ${LICHEE_OUT_DIR}/${IMG_NAME}
+			echo -e '\033[0m'
 		fi
 		fi
 	cd ..
@@ -1212,6 +1233,23 @@ function do_android_signature()
 				cp -v ${LICHEE_CHIP_CONFIG_DIR}/configs/default/dragon_toc_android.cfg dragon_toc.cfg
 			else
 				cp -v ${LICHEE_COMMON_CONFIG_DIR}/sign_config/dragon_toc_android.cfg dragon_toc.cfg
+			fi
+		fi
+	fi
+	if [ "x$LINUX_DTBO_FILE" = "x" ]; then
+		echo "do not set LINUX_DTBO_FILE"
+		line_num=`sed -n -e "/default.dtbo/=" dragon_toc.cfg`
+		if [ "x$line_num" != "x" ]; then
+			sed -i "$line_num s/^/;/g" dragon_toc.cfg
+		fi
+	else
+		if [ -f $LINUX_DTBO_FILE ]
+		then
+			sed -i "s/default.dtbo/$LINUX_DTBO_FILE/g" dragon_toc.cfg
+		else
+			line_num=`sed -n -e "/default.dtbo/=" dragon_toc.cfg`
+			if [ "x$line_num" != "x" ]; then
+				sed -i "$line_num s/^/;/g" dragon_toc.cfg
 			fi
 		fi
 	fi

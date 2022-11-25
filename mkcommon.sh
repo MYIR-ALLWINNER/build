@@ -198,11 +198,6 @@ while [ $# -gt 0 ]; do
 		module=buildroot;
 		break;
 		;;
-	qt)
-		ACTION="mkqt;";
-		module="";
-		break;
-		;;
 	ramfs)
 		ACTION="mkramfs;";
 		module=ramfs;

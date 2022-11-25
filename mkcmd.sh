@@ -48,17 +48,6 @@ export LICHEE_COMMON_CONFIG_DIR=${LICHEE_DEVICE_DIR}/config/common
 export LICHEE_OUT_DIR=$LICHEE_TOP_DIR/out
 export LICHEE_PACK_OUT_DIR=${LICHEE_OUT_DIR}/pack_out
 export LICHEE_TOOLCHAIN_PATH=${LICHEE_OUT_DIR}/external-toolchain/gcc-arm
-if [ "x${LICHEE_ARCH}" == "xarm64" ]; then
-export LICHEE_MALI_LIB_DIR=${LICHEE_PLATFORM_DIR}/core/graphics/gpu_um_pub/mali-bifrost/fbdev/mali-g31/aarch64-linux-gnu/lib
-else
-       export LICHEE_MALI_LIB_DIR=${LICHEE_PLATFORM_DIR}/core/graphics/gpu_um_pub/mali-bifrost/fbdev/mali-g31/arm-linux-gnu/lib
-fi
-export LICHEE_EGL_INC_DIR=${LICHEE_PLATFORM_DIR}/core/graphics/gpu_um_pub/mali-bifrost/include
-export LICHEE_MALI_INC_DIR=${LICHEE_PLATFORM_DIR}/core/graphics/gpu_um_pub/mali-bifrost/fbdev/include
-export AW_QT_VER=5.12.5
-export LICHEE_QT_DIR=${LICHEE_PLATFORM_DIR}/framework/qt/qt-everywhere-src-${AW_QT_VER}
-export QT_INSTALL_DIR=$LICHEE_QT_DIR/Qt_${AW_QT_VER}
-export QT_RUN_DIR=/usr/local/Qt_${AW_QT_VER}
 
 # make surce at the top directory of lichee
 if [ ! -d ${LICHEE_BUILD_DIR} -o \
@@ -75,9 +64,7 @@ LICHEE_IC
 LICHEE_CHIP
 LICHEE_ARCH
 LICHEE_KERN_VER
-LICHEE_KERN_SYSTEM
 LICHEE_KERN_DEFCONF
-LICHEE_KERN_DEFCONF_RECOVERY
 LICHEE_KERN_DEFCONF_RELATIVE
 LICHEE_KERN_DEFCONF_ABSOLUTE
 LICHEE_BUILDING_SYSTEM
@@ -117,17 +104,11 @@ LICHEE_PACK_OUT_DIR
 LICHEE_TOOLCHAIN_PATH
 LICHEE_PLAT_OUT
 LICHEE_BOARDCONFIG_PATH
-LICHEE_REDUNDANT_ENV_SIZE
 CONFIG_SESSION_SEPARATE
 ANDROID_CLANG_PATH
-LICHEE_COMPRESS
-ANDROID_TOOLCHAIN_PATH
-AW_QT_VER
-QT_INSTALL_DIR
-QT_RUN_DIR
-QT_TARGET_DIR)
+ANDROID_TOOLCHAIN_PATH)
 
-# export importance variable, and systemd opts
+# export importance variable
 platforms=(
 "android"
 "linux"
@@ -142,14 +123,6 @@ flash=(
 "nor"
 )
 
-gnueabi=(
-"gnueabi"
-"gnueabihf"
-)
-rootfs=(
-"buildroot-201902"
-"ubuntu"
-)
 cross_compiler=(
 'linux-3.4	arm		gcc-linaro.tar.bz2	target_arm.tar.bz2'
 'linux-3.4	arm64	gcc-linaro-aarch64.tar.xz	target_arm64.tar.bz2'
@@ -159,10 +132,6 @@ cross_compiler=(
 'linux-4.4	arm64	gcc-linaro-5.3.1-2016.05-x86_64_aarch64-linux-gnu.tar.xz	target-arm64-linaro-5.3.tar.bz2'
 'linux-4.9	arm		gcc-linaro-5.3.1-2016.05-x86_64_arm-linux-gnueabi.tar.xz	target-arm-linaro-5.3.tar.bz2'
 'linux-4.9	arm64	gcc-linaro-5.3.1-2016.05-x86_64_aarch64-linux-gnu.tar.xz	target-arm64-linaro-5.3.tar.bz2'
-'linux-4.19 arm     gcc-linaro-5.3.1-2016.05-x86_64_arm-linux-gnueabi.tar.xz    target-arm-linaro-5.3.tar.bz2'
-'linux-4.19 arm64   gcc-linaro-5.3.1-2016.05-x86_64_aarch64-linux-gnu.tar.xz    target-arm64-linaro-5.3.tar.bz2'
-'linux-5.4	arm		gcc-linaro-5.3.1-2016.05-x86_64_arm-linux-gnueabi.tar.xz	target-arm-linaro-5.3.tar.bz2'
-'linux-5.4	arm64	gcc-linaro-5.3.1-2016.05-x86_64_aarch64-linux-gnu.tar.xz	target-arm64-linaro-5.3.tar.bz2'
 )
 
 #eg. save_config "LICHEE_PLATFORM" "$LICHEE_PLATFORM" $BUILD_CONFIG
@@ -253,79 +222,6 @@ function check_env()
 	cd - > /dev/null
 }
 
-# support t113 compile(linux5.4)
-function kernel_config()
-{
-	prepare_toolchain
-	local MAKE="make"
-	local ARCH_PREFIX="arm"
-	local CROSS_COMPILE="${LICHEE_TOOLCHAIN_PATH}/bin/${LICHEE_CROSS_COMPILER}-"
-	local CLANG_TRIPLE=""
-	if [ -n "$ANDROID_CLANG_PATH" ]; then
-		export PATH=$ANDROID_CLANG_PATH:$PATH
-		MAKE="make CC=clang HOSTCC=clang LD=ld.lld NM=llvm-nm OBJCOPY=llvm-objcopy"
-		[ "x${LICHEE_ARCH}" = "xarm64" ] && ARCH_PREFIX=aarch64
-		if [ -n "$ANDROID_TOOLCHAIN_PATH" ]; then
-			CROSS_COMPILE=$ANDROID_TOOLCHAIN_PATH/$ARCH_PREFIX-linux-androidkernel-
-			CLANG_TRIPLE=$ARCH_PREFIX-linux-gnu-
-		fi
-	fi
-	MAKE+=" -C $LICHEE_KERN_DIR"
-	[ "$LICHEE_KERN_DIR" != "$KERNEL_BUILD_OUT_DIR" ] && \
-	MAKE+=" O=$KERNEL_BUILD_OUT_DIR"
-	case "$1" in
-		loadconfig)
-			local LOAD_DEFCONFIG_NAME=$LICHEE_KERN_DEFCONF_RELATIVE
-			if [ -n "$2" ]
-			then
-				LOAD_DEFCONFIG_NAME=$2
-			fi
-			(cd ${LICHEE_KERN_DIR} && \
-			ARCH_PREFIX=${ARCH_PREFIX} \
-			CLANG_TRIPLE=${CLANG_TRIPLE} \
-			CROSS_COMPILE=${CROSS_COMPILE} \
-			${MAKE} ARCH=${LICHEE_ARCH} defconfig KBUILD_DEFCONFIG=$LOAD_DEFCONFIG_NAME
-			)
-			;;
-		menuconfig)
-			(cd ${LICHEE_KERN_DIR} && \
-			ARCH_PREFIX=${ARCH_PREFIX} \
-			CLANG_TRIPLE=${CLANG_TRIPLE} \
-			CROSS_COMPILE=${CROSS_COMPILE} \
-			${MAKE} ARCH=${LICHEE_ARCH} menuconfig
-			)
-			;;
-		saveconfig)
-			local SAVE_DEFCONFIG_NAME=$LICHEE_KERN_DEFCONF_ABSOLUTE
-			if [ -n "$2" ]
-			then
-				SAVE_DEFCONFIG_NAME=$(dirname $LICHEE_KERN_DEFCONF_ABSOLUTE)/$2
-			fi
-			(cd ${LICHEE_KERN_DIR} && \
-			ARCH_PREFIX=${ARCH_PREFIX} \
-			CLANG_TRIPLE=${CLANG_TRIPLE} \
-			CROSS_COMPILE=${CROSS_COMPILE} \
-			${MAKE} ARCH=${LICHEE_ARCH} savedefconfig && \
-			mv $KERNEL_BUILD_OUT_DIR/defconfig $SAVE_DEFCONFIG_NAME
-			)
-			;;
-		mergeconfig)
-			([ "$1" == "mergeconfig" ] && \
-			cd ${LICHEE_KERN_DIR} && \
-			ARCH=${LICHEE_ARCH} ${LICHEE_KERN_DIR}/scripts/kconfig/merge_config.sh \
-			-O ${KERNEL_BUILD_OUT_DIR} \
-			${LICHEE_KERN_DIR}/arch/${LICHEE_ARCH}/configs/${LICHEE_CHIP}smp_defconfig \
-			${LICHEE_KERN_DIR}/kernel/configs/android-base.config  \
-			${LICHEE_KERN_DIR}/kernel/configs/android-recommended.config  \
-			${LICHEE_KERN_DIR}/kernel/configs/sunxi-recommended.config
-			)
-			;;
-		*)
-			mk_error "Unsupport action: $1"
-			return 1
-			;;
-	esac
-}
 function init_defconf()
 {
 	if [ "x${LICHEE_KERN_DIR}" != "x" ]; then
@@ -355,11 +251,8 @@ function init_defconf()
 		fi
 		save_config "LICHEE_KERN_DEFCONF_RELATIVE" ${relative_path} $BUILD_CONFIG
 		save_config "LICHEE_KERN_DEFCONF_ABSOLUTE" ${absolute_path} $BUILD_CONFIG
-		LICHEE_KERN_DEFCONF_RELATIVE=$relative_path
-		LICHEE_KERN_DEFCONF_ABSOLUTE=$absolute_path
-		prepare_toolchain
-		mk_info "kernel defconfig: generate ${KERNEL_BUILD_OUT_DIR}/.config by ${absolute_path}"
-		kernel_config "loadconfig"
+		mk_info "kernel defconfig: generate ${LICHEE_KERN_DIR}/.config by ${absolute_path}"
+		(cd ${LICHEE_KERN_DIR};make ARCH=${LICHEE_ARCH} defconfig KBUILD_DEFCONFIG=${relative_path})
 	fi
 	if [ ${LICHEE_PLATFORM} = "linux" ] ; then
 		if [ -d ${LICHEE_BR_DIR} -a -f ${LICHEE_BR_DIR}/configs/${LICHEE_BR_DEFCONF} ]; then
@@ -369,17 +262,8 @@ function init_defconf()
 		else
 			mk_info "skip buildroot"
 		fi
-	elif [ ${LICHEE_PLATFORM} = "3rd" ]; then
-		local rootfs_dir
-		local dest=rootfs.ext4
-		if [ ${LICHEE_PLATFORM} = "3rd" ]; then
-			rootfs_dir=${LICHEE_TOP_DIR}/3rd/u_rootfs
-		fi
-
-		if [ -z ${rootfs_dir} ];  then
-			mk_error "file ${rootfs_dir} not exist!"
-		fi
 	fi
+
 	#mkdir out directory:
 	check_output_dir
 }
@@ -449,16 +333,6 @@ function init_boards()
 	return $?
 }
 
-function init_rootfs()
-{
-	local chip=$1
-	local cfg_val=$2 # board
-	local cfg_key="LICHEE_BUILD_ROOT"
-	local val_list=$(list_subdir $LICHEE_TOP_DIR/buildroot | grep -v default)
-	#local val_list=${rootfs[@]}
-	init_key "$val_list" "$cfg_key" "$cfg_val"
-	return $?
-}
 function mk_select()
 {
 	local val_list=$1
@@ -529,9 +403,6 @@ function mk_autoconfig()
 
 	#init defconfig
 	init_defconf
-	#restart buildserver
-	clbuildserver
-	prepare_buildserver
 }
 
 function mk_config()
@@ -541,29 +412,21 @@ function mk_config()
 
 	if [ ${LICHEE_PLATFORM} = "linux" ] ; then
 		select_linux_development
-		if [ ${LICHEE_LINUX_DEV} = "bsp" -o ${LICHEE_LINUX_DEV} = "longan" ] ; then
+		if [ ${LICHEE_LINUX_DEV} = "bsp" ] ; then
 			select_kern_ver
 		fi
 		if [ ${LICHEE_LINUX_DEV} = "sata" ] ; then
 			select_sata_module
-		fi
-	elif [ ${LICHEE_PLATFORM} = "3rd" ]; then
-		select_linux_development
-		if [ ${LICHEE_LINUX_DEV} = "systemd" ] ; then
-			select_kern_ver
 		fi
 	fi
 
 	select_ic
 	select_board
 
-	select_flash
-
-	# only for t113, can choose hard float toolchain for buildroot
-	if [ "x$LICHEE_IC" == "xt113" ] ; then
-		select_gnueabi
+	if [ ${LICHEE_PLATFORM} = "linux" ] ; then
+		select_flash
 	fi
-	select_rootfs
+
 	#parse boardconfig
 	parse_boardconfig
 
@@ -576,9 +439,6 @@ function mk_config()
 
 	#init defconfig
 	init_defconf
-	#restart buildserver
-	clbuildserver
-	prepare_buildserver
 }
 
 function clean_old_env_var()
@@ -604,7 +464,6 @@ function init_global_variable()
 
 	export LICHEE_BRANDY_OUT_DIR=${LICHEE_DEVICE_DIR}/config/chips/${LICHEE_IC}/bin
 	export LICHEE_BR_OUT=${LICHEE_OUT_DIR}/${LICHEE_IC}/${LICHEE_BOARD}/${LICHEE_LINUX_DEV}/buildroot
-	export QT_TARGET_DIR=$LICHEE_BR_OUT/target/${QT_RUN_DIR}
 
 	if [ ${LICHEE_PLATFORM} = "android" ] ; then
 		export LICHEE_PLAT_OUT=${LICHEE_OUT_DIR}/${LICHEE_IC}/${LICHEE_BOARD}/${LICHEE_PLATFORM}
@@ -666,20 +525,12 @@ function substitute_inittab()
 	if [ "x${LICHEE_PLATFORM}" = "xlinux" ]; then
 		if [ "x${LICHEE_LINUX_DEV}" != "xbsp" ] && [ "x${LICHEE_LINUX_DEV}" != "xdragonboard" ]; then
 			if [ "x${LICHEE_LINUX_DEV}" = "xlongan" ];then
-				if [ "x${LICHEE_FLASH}" = "xnor" ]; then
-					env_cfg_dir=${LICHEE_BOARD_CONFIG_DIR}/${LICHEE_PLATFORM}/env_nor.cfg
-				else
 				env_cfg_dir=${LICHEE_BOARD_CONFIG_DIR}/${LICHEE_PLATFORM}/env.cfg
-				fi
 			else
 				env_cfg_dir=${LICHEE_BOARD_CONFIG_DIR}/${LICHEE_LINUX_DEV}/env.cfg
 			fi
 			if [ ! -f ${env_cfg_dir} ];then
 				env_cfg_dir=${LICHEE_CHIP_CONFIG_DIR}/configs/default/env.cfg
-			fi
-		elif [ "x${LICHEE_LINUX_DEV}" = "xbsp" ]; then
-			if [ -f ${LICHEE_BOARD_CONFIG_DIR}/${LICHEE_LINUX_DEV}/env.cfg ]; then
-				env_cfg_dir=${LICHEE_BOARD_CONFIG_DIR}/${LICHEE_LINUX_DEV}/env.cfg
 			fi
 		fi
 	fi
@@ -726,15 +577,6 @@ function parse_boardconfig()
 	elif [ "x${LICHEE_PLATFORM}" = "xlinux" ]; then
 		config_list=($default_config $default_config_nor $special_config $special_config_linux $special_config_linux_nor)
 		[ ${LICHEE_FLASH} != "nor" ] && config_list=($default_config $special_config $special_config_linux)
-		if [ ${LICHEE_FLASH} = "nor" ]; then
-			if [ -f $special_config_linux_nor ]; then
-				config_list=($special_config_linux_nor)
-			else
-				config_list=($default_config_nor)
-			fi
-		fi
-	elif [ "x${LICHEE_PLATFORM}" = "x3rd" ]; then
-		config_list=($default_config $special_config $special_config_linux)
 	else
 		mk_error "Unsupport LICHEE_PLATFORM!"
 	fi
@@ -761,9 +603,7 @@ function parse_boardconfig()
 			LICHEE_KERN_DEFCONF  LICHEE_BUILDING_SYSTEM  LICHEE_BR_VER        LICHEE_BR_DEFCONF
 			LICHEE_PRODUCT       LICHEE_ARCH             LICHEE_BRANDY_VER    LICHEE_BRANDY_DEFCONF
 			LICHEE_COMPILER_TAR  LICHEE_ROOTFS           LICHEE_KERN_VER      LICHEE_BUSSINESS
-			ANDROID_CLANG_PATH   ANDROID_TOOLCHAIN_PATH  LICHEE_BR_RAMFS_CONF LICHEE_CHIP
-			LICHEE_PACK_HOOK     LICHEE_REDUNDANT_ENV_SIZE LICHEE_BRANDY_SPL  LICHEE_COMPRESS
-			LICHEE_FLASH LICHEE_KERN_DEFCONF_RECOVERY)
+			ANDROID_CLANG_PATH   ANDROID_TOOLCHAIN_PATH  LICHEE_BR_RAMFS_CONF LICHEE_CHIP)
 
 	local cfgkey=""
 	local cfgval=""
@@ -780,11 +620,6 @@ function parse_boardconfig()
 	fi
 	if [ -z ${LICHEE_ROOTFS} ]; then
 		parse_rootfs_tar ${LICHEE_KERN_VER} ${LICHEE_ARCH}
-	fi
-	# if choose hard float, modify the buildroot defconfig
-	if [ "x$LICHEE_GNUEABI" == "xgnueabihf" ] ; then
-		len=${#LICHEE_BR_DEFCONF}-9
-		export LICHEE_BR_DEFCONF=${LICHEE_BR_DEFCONF:0:len}hf_defconfig
 	fi
 }
 
@@ -842,10 +677,6 @@ function select_ic()
 function select_platform()
 {
 	local val_list="${platforms[@]}"
-
-	[ -d ${LICHEE_TOP_DIR}/3rd ] && \
-	val_list+=" 3rd"
-
 	local cfg_key="LICHEE_PLATFORM"
 	mk_select "$val_list" "$cfg_key"
 }
@@ -863,9 +694,6 @@ function select_linux_development()
 
 	[ -n "$(find $LICHEE_TOP_DIR/buildroot -maxdepth 1 -type d -name "buildroot-*" 2>/dev/null)" ] && \
 	val_list="$val_list longan tinyos"
-
-	[ -d ${LICHEE_TOP_DIR}/3rd ] && \
-	val_list+=" systemd"
 
 	mk_select "$val_list" "$cfg_key"
 }
@@ -890,41 +718,6 @@ function select_flash()
 	mk_select "$val_list" "$cfg_key"
 }
 
-#function select_buildroot()
-function select_rootfs()
-{
-	rootfs[0]="buildroot-201902"
-	rootfs[1]="ubuntu"
-	printf "All available rootfs:\n"
-	printf "  0. %s \n" ${rootfs[0]}
-	printf "  1. %s \n" ${rootfs[1]}
-	local val_list=$(list_subdir $LICHEE_TOP_DIR/buildroot)
-	local cfg_key="LICHEE_BUILD_ROOT"
-	mk_select "$val_list" "$cfg_key"
-	#local chip=$1
-	#local cfg_val=$2 # board
-	#local cfg_key="LICHEE_BOARD"
-	#local val_list=$(list_subdir $LICHEE_DEVICE_DIR/buildroot | grep -v default)
-	#while true ; do
-	#	read -p "Choice: " choice
-	#	if [ -z "${choice}" ] ; then
-	#		continue
-	#	fi
-	#	if [ -z "${choice//[0-9]/}" ] ; then
-	#		if [ $choice -ge 0 -a $choice -lt 3 ] ; then
-	#			export LICHEE_BUILD_ROOT="${rootfs[$choice]}"
-	#			echo "export LICHEE_BUILD_ROOT=${rootfs[$choice]}" >> ${BUILD_CONFIG}
-	#			break
-	#		fi
-	#	fi
-	#	printf "Invalid input ...\n"
-	#done
-	#echo select $LICHEE_BUILD_ROOT
-	#save_config "$cfg_key" "$cfg_val" $BUILD_CONFIG
-	#if [ "${LICHEE_BUILD_ROOT}" = "buildroot-201611" ] ; then
-	#	select_gnueabi
-	#fi
-}
 function select_kern_ver()
 {
 	local val_list=$(list_subdir $LICHEE_TOP_DIR/kernel | grep "linux-")
@@ -939,12 +732,6 @@ function select_board()
 	mk_select "$val_list" "$cfg_key"
 }
 
-function select_gnueabi()
-{
-        local val_list=${gnueabi[@]}
-        local cfg_key="LICHEE_GNUEABI"
-        mk_select "$val_list" "$cfg_key"
-}
 function get_file_create_time()
 {
 	local file=$1;
@@ -987,75 +774,10 @@ function mkramfs()
 	[ $? -ne 0 ] && mk_error "build ramfs Failed" && return 1
 }
 
-function pregpu()
-{
-	mk_info "pre gpu lib..."
-	if [ "x${LICHEE_ARCH}" == "xarm64" ]; then
-	cp  ${LICHEE_MALI_LIB_DIR}/* $LICHEE_BR_OUT/host/aarch64-buildroot-linux-gnu/sysroot/usr/lib -rf
-    else
-            cp  ${LICHEE_MALI_LIB_DIR}/* $LICHEE_BR_OUT/host/arm-buildroot-linux-gnueabi/sysroot/usr/lib -rf
-    fi
-	cp  ${LICHEE_MALI_LIB_DIR}/* $LICHEE_BR_OUT/target/usr/lib -rf
-    if [ "x${LICHEE_ARCH}" == "xarm64" ]; then
-	cp  ${LICHEE_EGL_INC_DIR}/* $LICHEE_BR_OUT/host/aarch64-buildroot-linux-gnu/sysroot/usr/include -rf
-	cp  ${LICHEE_MALI_INC_DIR}/* $LICHEE_BR_OUT/host/aarch64-buildroot-linux-gnu/sysroot/usr/include -rf
-    else
-            cp  ${LICHEE_EGL_INC_DIR}/* $LICHEE_BR_OUT/host/arm-buildroot-linux-gnueabi/sysroot/usr/include -rf
-            cp  ${LICHEE_MALI_INC_DIR}/* $LICHEE_BR_OUT/host/arm-buildroot-linux-gnueabi/sysroot/usr/include -rf
-    fi
-}
-
-function mkqt()
-{
-	mk_info "build Qt ..."
-	if [ "xarm-linux-gnueabi" = "x${LICHEE_CROSS_COMPILER}" ]; then
-		mk_info "build ${LICHEE_CROSS_COMPILER} version's Qt"
-		local build_script="buildsetup_sf.sh"
-	elif [ "xarm-linux-gnueabihf" = "x${LICHEE_CROSS_COMPILER}" ]; then
-		mk_info "build ${LICHEE_CROSS_COMPILER} version's Qt"
-		local build_script="buildsetup_hf.sh"
-	else
-		mk_info "build aarch64 version's Qt"
-		local build_script="buildsetup.sh"
-	fi
-
-	if [ -d ${LICHEE_QT_DIR} ];  then
-		cd ${LICHEE_QT_DIR}
-		source ${build_script}
-
-		qtmakeconfig
-		qtmakeall
-		qtmakeinstall
-
-		mkbr
-		mk_info "build Qt and buildroot Ok."
-
-	else
-		mk_error "build Qt Failed"
-	fi
-
-}
-function clqt()
-{
-	mk_info "clean Qt ..."
-	local build_script="build.sh"
-	echo ${LICHEE_QT_DIR}
-
-	if [ -d ${LICHEE_QT_DIR} ];  then
-		cd ${LICHEE_QT_DIR}
-		source ${build_script}
-		qtmakecleanall
-
-		mk_info "clean Qt Ok."
-	else
-		mk_error "clean Qt Failed"
-	fi
-}
-
 function mkbr()
 {
 	mk_info "build buildroot ..."
-	mk_info "=====YTR=====${LICHEE_BR_DIR}."
+
 	#build buildroot
 	local build_script="build.sh"
 
@@ -1073,7 +795,7 @@ function mkbr()
 		make -C ${LICHEE_PLATFORM_DIR}/ INSTALL_FILES
 		[ $? -ne 0 ] && mk_error "copy the config files from device Failed" && return 1
 	else
-		mk_error "you need build buildroot first!" && return 1
+		mk_error "you nend build buildroot first!" && return 1
 	fi
 
 	modify_longan_config
@@ -1090,7 +812,7 @@ function mkbr()
 		mk_info "create rootfs tar ..."
 		(cd ${LICHEE_BR_OUT}/target && tar -jcf ${rootfs_name} ./* && mv ${rootfs_name} ${LICHEE_DEVICE_DIR}/config/rootfs_tar)
 	fi
-	pregpu
+
 	mk_info "build buildroot OK."
 }
 
@@ -1102,22 +824,6 @@ function clbr()
 	(cd ${LICHEE_BR_DIR} && [ -x ${build_script} ] && ./${build_script} "clean")
 
 	mk_info "clean buildroot OK."
-}
-
-function prepare_buildserver()
-{
-	cd $LICHEE_TOP_DIR/tools/build
-	if [ -f buildserver ]; then
-		mk_info "prepare_buildserver"
-		./buildserver --path $LICHEE_TOP_DIR >/dev/null &
-	fi
-}
-
-function clbuildserver()
-{
-	mk_info "clean buildserver"
-	lsof $LICHEE_TOP_DIR/tools/build/buildserver 2>/dev/null | awk '/buildserver$/{print $2}' | xargs kill -9
-
 }
 
 function prepare_toolchain()
@@ -1132,26 +838,6 @@ function prepare_toolchain()
 	local boardconfig="${LICHEE_BOARDCONFIG_PATH}"
 
 	mk_info "Prepare toolchain ..."
-
-	if [ -f $LICHEE_KERN_DIR/scripts/build.sh ]; then
-		KERNEL_BUILD_SCRIPT_DIR=$LICHEE_KERN_DIR
-		KERNEL_BUILD_SCRIPT=scripts/build.sh
-		KERNEL_BUILD_OUT_DIR=$LICHEE_KERN_DIR
-		KERNEL_STAGING_DIR=$LICHEE_KERN_DIR/output
-	else
-		KERNEL_BUILD_SCRIPT_DIR=$LICHEE_BUILD_DIR
-		KERNEL_BUILD_SCRIPT=mkkernel.sh
-		KERNEL_BUILD_OUT_DIR=$LICHEE_OUT_DIR/kernel/build
-		KERNEL_STAGING_DIR=$LICHEE_OUT_DIR/kernel/staging
-		if [ ! -d "$KERNEL_BUILD_OUT_DIR" ]; then
-			mkdir -p "$KERNEL_BUILD_OUT_DIR"
-		fi
-
-		if [ ! -d "$KERNEL_STAGING_DIR" ]; then
-			mkdir -p "$KERNEL_STAGING_DIR"
-		fi
-
-	fi
 
 	if [ -n "$ANDROID_CLANG_PATH" ]; then
 		if  [ ! -f "$LICHEE_TOP_DIR/../$ANDROID_CLANG_PATH/clang" ]; then
@@ -1169,7 +855,6 @@ function prepare_toolchain()
 
 	toolchain_archive=${LICHEE_COMPILER_TAR}
 	toolchain_archivedir=${LICHEE_BUILD_DIR}/toolchain/${toolchain_archive}
-	echo "toolchain_archivedir=${LICHEE_BUILD_DIR}/toolchain/${toolchain_archive}"
 	if [ ! -f ${toolchain_archivedir} ]; then
 		mk_error "Prepare toolchain error!"
 		exit 1
@@ -1256,7 +941,7 @@ function prepare_dragonboard_toolchain()
 function prepare_mkkernel()
 {
 	# mark kernel .config belong to which platform
-	local config_mark="${KERNEL_BUILD_OUT_DIR}/.config.mark"
+	local config_mark="${LICHEE_KERN_DIR}/.config.mark"
 	local board_dts="$LICHEE_BOARD_CONFIG_DIR/board.dts"
 	if [ -f ${board_dts} ]; then
 		if [ "x${LICHEE_ARCH}" == "xarm64" ]; then
@@ -1271,8 +956,8 @@ function prepare_mkkernel()
 		if [ ${tmp} != ${tmp1} ] ; then
 			mk_info "clean last time build for different platform"
 			if [ "x${LICHEE_KERN_DIR}" != "x" -a -d ${LICHEE_KERN_DIR} ]; then
-				(cd ${KERNEL_BUILD_SCRIPT_DIR} && [ -x ${KERNEL_BUILD_SCRIPT} ] && ./${KERNEL_BUILD_SCRIPT} "distclean")
-				rm -rf ${KERNEL_BUILD_OUT_DIR}/.config
+				(cd ${LICHEE_KERN_DIR} && [ -x ${build_script} ] && ./${build_script} "clean")
+				rm -rf ${LICHEE_KERN_DIR}/.config
 				echo "${LICHEE_CHIP}_${LICHEE_BOARD}_${LICHEE_PLATFORM}" > ${config_mark}
 			fi
 		fi
@@ -1285,30 +970,19 @@ function mkdts(){
 	local build_script="scripts/build.sh"
 	prepare_toolchain
 	prepare_mkkernel
-
-	[ "$build" != "false" ] && \
-	(cd ${KERNEL_BUILD_SCRIPT_DIR} && [ -x ${KERNEL_BUILD_SCRIPT} ] && ./${KERNEL_BUILD_SCRIPT} dts)
-
+	(cd ${LICHEE_KERN_DIR} && [ -x ${build_script} ] && ./${build_script} dts)
 
 	if [ "x$LICHEE_KERN_VER" != "xlinux-3.4" ]; then
 		cp ${LICHEE_KERN_DIR}/scripts/dtc/dtc ${LICHEE_PLAT_OUT}
 		local dts_path=$LICHEE_KERN_DIR/arch/${LICHEE_ARCH}/boot/dts
 		[ "x${LICHEE_ARCH}" == "xarm64" ] && \
 		dts_path=$dts_path/sunxi
+		rm -rf ${LICHEE_PLAT_OUT}/.sun*.dtb.*.tmp
+		cp $dts_path/.${LICHEE_CHIP}-*.dtb.d.dtc.tmp ${LICHEE_PLAT_OUT}
+		cp $dts_path/.${LICHEE_CHIP}-*.dtb.dts.tmp ${LICHEE_PLAT_OUT}
 
-		local copy_list=(
-			$dts_path/.${LICHEE_CHIP}-*.dtb.d.dtc.tmp:${LICHEE_PLAT_OUT}
-			$dts_path/.${LICHEE_CHIP}-*.dtb.dts.tmp:${LICHEE_PLAT_OUT}
-			$dts_path/.board.dtb.d.dtc.tmp:${LICHEE_PLAT_OUT}
-			$dts_path/.board.dtb.dts.tmp:${LICHEE_PLAT_OUT}
-			${KERNEL_STAGING_DIR}/.sunxi.dts:${LICHEE_PLAT_OUT}
-			${KERNEL_STAGING_DIR}/sunxi.dtb:${LICHEE_PLAT_OUT}
-		)
-
-		rm -vf ${LICHEE_PLAT_OUT}/.board.dtb.*.tmp ${LICHEE_PLAT_OUT}/board.dtb
-		for e in ${copy_list[@]}; do
-			cp -vf ${e/:*} ${e#*:} 2>/dev/null
-		done
+		cp $dts_path/.board.dtb.d.dtc.tmp ${LICHEE_PLAT_OUT} 2>/dev/null
+		cp $dts_path/.board.dtb.dts.tmp ${LICHEE_PLAT_OUT} 2>/dev/null
 	fi
 }
 
@@ -1318,20 +992,17 @@ function mkkernel()
 
 	local build_script="scripts/build.sh"
 
-	LICHEE_KERN_SYSTEM="kernel_boot"
-
-	prepare_buildserver
 	prepare_toolchain
 
 	prepare_mkkernel
-	echo "(cd ${KERNEL_BUILD_SCRIPT_DIR} && [ -x ${KERNEL_BUILD_SCRIPT} ] && ./${KERNEL_BUILD_SCRIPT})"
-	(cd ${KERNEL_BUILD_SCRIPT_DIR} && [ -x ${KERNEL_BUILD_SCRIPT} ] && ./${KERNEL_BUILD_SCRIPT} $@)
+
+	(cd ${LICHEE_KERN_DIR} && [ -x ${build_script} ] && ./${build_script})
 	[ $? -ne 0 ] && mk_error "build kernel Failed" && return 1
 
 	# copy files related to pack to platform out
 	cp $BUILD_CONFIG $LICHEE_PLAT_OUT
-	cp ${KERNEL_BUILD_OUT_DIR}/vmlinux ${LICHEE_PLAT_OUT}
-	if [ "x$LICHEE_KERN_VER" != "xlinux-5.4" ]; then
+	cp ${LICHEE_KERN_DIR}/vmlinux ${LICHEE_PLAT_OUT}
+	if [ "x$LICHEE_KERN_VER" != "xlinux-3.4" ]; then
 		cp ${LICHEE_KERN_DIR}/scripts/dtc/dtc ${LICHEE_PLAT_OUT}
 		local dts_path=$LICHEE_KERN_DIR/arch/${LICHEE_ARCH}/boot/dts
 		[ "x${LICHEE_ARCH}" == "xarm64" ] && \
@@ -1342,66 +1013,9 @@ function mkkernel()
 
 		cp $dts_path/.board.dtb.d.dtc.tmp ${LICHEE_PLAT_OUT} 2>/dev/null
 		cp $dts_path/.board.dtb.dts.tmp ${LICHEE_PLAT_OUT} 2>/dev/null
-	else
-		mkdts "false"
 	fi
 
 	mk_info "build kernel OK."
-
-	#delete board.dts
-	if [ "x${LICHEE_ARCH}" == "xarm64" ]; then
-		if [ -f ${LICHEE_KERN_DIR}/arch/${LICHEE_ARCH}/boot/dts/sunxi/board.dts ]; then
-			rm ${LICHEE_KERN_DIR}/arch/${LICHEE_ARCH}/boot/dts/sunxi/board.dts
-		fi
-	else
-		if [ -f ${LICHEE_KERN_DIR}/arch/${LICHEE_ARCH}/boot/dts/board.dts ];then
-			rm ${LICHEE_KERN_DIR}/arch/${LICHEE_ARCH}/boot/dts/board.dts
-		fi
-	fi
-}
-
-function mkrecovery()
-{
-	mk_info "build recovery ..."
-
-	local build_script="scripts/build.sh"
-
-	LICHEE_KERN_SYSTEM="kernel_recovery"
-
-	prepare_toolchain
-
-	prepare_mkkernel
-
-	if [ "x${LICHEE_IC}" == "xt113" ]; then
-		echo "(cd ${KERNEL_BUILD_SCRIPT_DIR} && [ -x ${KERNEL_BUILD_SCRIPT} ] && ./${KERNEL_BUILD_SCRIPT})"
-		(cd ${KERNEL_BUILD_SCRIPT_DIR} && [ -x ${KERNEL_BUILD_SCRIPT} ] && ./${KERNEL_BUILD_SCRIPT} $@)
-	else
-		echo "(cd ${LICHEE_KERN_DIR} && [ -x ${build_script} ] && ./${build_script})"
-	(cd ${LICHEE_KERN_DIR} && [ -x ${build_script} ] && ./${build_script})
-	fi
-	[ $? -ne 0 ] && mk_error "build kernel Failed" && return 1
-
-	# copy files related to pack to platform out
-	#cp $BUILD_CONFIG $LICHEE_PLAT_OUT
-	#cp ${LICHEE_KERN_DIR}/vmlinux ${LICHEE_PLAT_OUT}
-	#if [ "x$LICHEE_KERN_VER" != "xlinux-3.4" ]; then
-	#	cp ${LICHEE_KERN_DIR}/scripts/dtc/dtc ${LICHEE_PLAT_OUT}
-	#	local dts_path=$LICHEE_KERN_DIR/arch/${LICHEE_ARCH}/boot/dts
-	#	[ "x${LICHEE_ARCH}" == "xarm64" ] && \
-	#	dts_path=$dts_path/sunxi
-	#	rm -rf ${LICHEE_PLAT_OUT}/.sun*.dtb.*.tmp
-	#	cp $dts_path/.${LICHEE_CHIP}-*.dtb.d.dtc.tmp ${LICHEE_PLAT_OUT} 2>/dev/null
-	#	cp $dts_path/.${LICHEE_CHIP}-*.dtb.dts.tmp ${LICHEE_PLAT_OUT} 2>/dev/null
-    #
-	#	cp $dts_path/.board.dtb.d.dtc.tmp ${LICHEE_PLAT_OUT} 2>/dev/null
-	#	cp $dts_path/.board.dtb.dts.tmp ${LICHEE_PLAT_OUT} 2>/dev/null
-	#fi
-
-	mk_info "build recovery OK."
-	if [ "x${LICHEE_IC}" == "xt113" ]; then
-		#delete .config
-		rm -rf ${LICHEE_OUT_DIR}/kernel/build/.config
-	fi
 
 	#delete board.dts
 	if [ "x${LICHEE_ARCH}" == "xarm64" ]; then
@@ -1472,7 +1086,7 @@ function mkbootloader()
 	fi
 
 	mk_info "mkbootloader: brandy_path= ${brandy_path}"
-	(cd ${brandy_path} && [ -x ${build_script} ] && ./${build_script} -p ${LICHEE_BRANDY_DEFCONF%%_def*})
+	(cd ${brandy_path} && [ -x ${build_script} ] && ./${build_script} -p ${LICHEE_CHIP})
 	[ $? -ne 0 ] && mk_error "build brandy Failed" && return 1
 
 	mk_info "build brandy OK."
@@ -1603,7 +1217,7 @@ function mk_defroot()
 	export PATH=$PATH:${LICHEE_BUILD_DIR}/bin
 	fakeroot chown	 -h -R 0:0	${ROOTFS}
 	fakeroot mke2img -d ${ROOTFS} -G 4 -R 1 -B 0 -I 0 -o ${LICHEE_PLAT_OUT}/rootfs.ext4
-	fakeroot mkfs.ubifs -m 4096 -e 258048 -c 245 -F -x zlib -r ${ROOTFS} -o ${LICHEE_PLAT_OUT}/rootfs.ubifs
+	fakeroot mkfs.ubifs -m 4096 -e 258048 -c 145 -F -x zlib -r ${ROOTFS} -o ${LICHEE_PLAT_OUT}/rootfs.ubifs
 
 cat  > ${LICHEE_PLAT_OUT}/.rootfs << EOF
 chown -h -R 0:0 ${ROOTFS}
@@ -1616,129 +1230,6 @@ EOF
 	fakeroot -- ${LICHEE_PLAT_OUT}/.rootfs
 }
 
-function mk_norroot()
-{
-	echo "make nor flash rootfs"
-	local ROOTFS=${LICHEE_PLAT_OUT}/rootfs_def
-	local INODES=""
-	local BLOCKS=""
-	local rootfs_archive=""
-	local rootfs_archivedir=""
-	local boardconfig="${LICHEE_BOARDCONFIG_PATH}"
-
-	#rootfs_archive=`cat ${boardconfig} | grep -w "LICHEE_ROOTFS" | awk -F= '{printf $2}'`
-	rootfs_archive=${LICHEE_ROOTFS}
-	#rootfs_archive=mini_rootfs.tar.gz
-	rootfs_archivedir=${LICHEE_DEVICE_DIR}/config/rootfs_tar/${rootfs_archive}
-	mk_info "Build default rootfs ..."
-	if [ "$1" = "f" ]; then
-	rm -fr ${ROOTFS}
-	fi
-
-	if [ ! -d ${ROOTFS} ]; then
-		mkdir -p ${ROOTFS}
-		if [ -f ${rootfs_archivedir} ];then
-			fakeroot tar -jxf ${rootfs_archivedir} -C ${ROOTFS}
-		else
-			mk_error "cann't find ${rootfs_archive}"
-		fi
-	fi
-
-	mkdir -p ${ROOTFS}/lib/modules
-	cp -rf ${LICHEE_KERN_DIR}/output/lib/modules/* \
-		${ROOTFS}/lib/modules/
-
-	(cd ${ROOTFS}; ln -fs bin/busybox init)
-	substitute_inittab ${ROOTFS}/etc/inittab
-	export PATH=$PATH:${LICHEE_BUILD_DIR}/bin
-	fakeroot chown   -h -R 0:0      ${ROOTFS}
-	fakeroot mke2img -d ${ROOTFS} -G 4 -R 1 -B 0 -I 0 -o ${LICHEE_PLAT_OUT}/rootfs.ext4
-	fakeroot mkfs.ubifs -m 4096 -e 258048 -c 245 -F -x zlib -r ${ROOTFS} -o ${LICHEE_PLAT_OUT}/rootfs.ubifs
-
-	cat  > ${LICHEE_PLAT_OUT}/.rootfs << EOF
-	chown -h -R 0:0 ${ROOTFS}
-	${LICHEE_BUILD_DIR}/bin/makedevs -d \
-	${LICHEE_DEVICE_DIR}/config/rootfs_tar/_device_table.txt ${ROOTFS}
-	${LICHEE_BUILD_DIR}/bin/mksquashfs \
-	${ROOTFS} ${LICHEE_PLAT_OUT}/rootfs.squashfs -root-owned -no-progress -comp xz -noappend
-EOF
-
-	chmod a+x ${LICHEE_PLAT_OUT}/.rootfs
-	fakeroot -- ${LICHEE_PLAT_OUT}/.rootfs
-}
-
-
-function make_ext4()
-{
-	local target_dir
-
-	PARTITION_FEX=${LICHEE_BOARD_CONFIG_DIR}/${LICHEE_LINUX_DEV}/sys_partition.fex
-
-    echo "PARTITION_FEX=$PARTITION_FEX"
-	ROOTFS_FEX_LINE=`awk "/rootfs.fex/{print NR}" $PARTITION_FEX |head -n1`
-    echo "ROOTFS_FEX_LINE=$ROOTFS_FEX_LINE"
-	ROOTFS_FEX_STR=$(awk "NR==${ROOTFS_FEX_LINE}-1 {print $NF}" $PARTITION_FEX)
-	echo "ROOTFS_FEX_STR=${ROOTFS_FEX_STR}"
-    ROOTFS_FEX_SIZE=$(echo $ROOTFS_FEX_STR |  cut -d "=" -f 2)
-	if [ -z ${ROOTFS_FEX_SIZE} ]; then
-	#use default rootfs partitions size 1GB
-		ROOTFS_FEX_SIZE=2097152
-		echo "can't find rootfs size in sys_partition.fex, use default $ROOTFS_FEX_SIZE"
-	fi
-	echo "ROOTFS_FEX_SIZE=$ROOTFS_FEX_SIZE"
-    EXT4_SIZE=$(expr $ROOTFS_FEX_SIZE \* 512)
-    echo "EXT4_SIZE=$EXT4_SIZE(`expr $EXT4_SIZE/1024/1024`)"
-
-    echo "$PARTITION_FEX rootfs.fex size is $ROOTFS_FEX_SIZE"
-    echo "EXT4_SIZE=$ROOTFS_FEX_SIZE*512=$EXT4_SIZE"
-
-	if [ ${LICHEE_PLATFORM} = "linux" ]; then
-		target_dir=$1
-	elif [ ${LICHEE_PLATFORM} = "3rd" ]; then
-		target_dir=${LICHEE_TOP_DIR}/3rd/u_rootfs
-	fi
-
-    $LICHEE_BUILD_DIR/bin/make_ext4fs -s -l $EXT4_SIZE ${LICHEE_PLAT_OUT}/rootfs.ext4  ${target_dir}
-	echo "$LICHEE_BUILD_DIR/bin/make_ext4fs -s -l $EXT4_SIZE ${LICHEE_PLAT_OUT}/rootfs.ext4  ${target_dir}"
-}
-
-function make_squashfs()
-{
-	#local ROOTFS=${LICHEE_BR_OUT}/target
-	local target_dir=$1
-	fakeroot ${LICHEE_BUILD_DIR}/bin/mksquashfs \
-	${target_dir} ${LICHEE_PLAT_OUT}/rootfs.squashfs -root-owned -no-progress -comp xz -noappend
-}
-function make_ubifs()
-{
-	local target_dir=$1
-	fakeroot ${LICHEE_BUILD_DIR}/bin/mkfs.ubifs \
-		-m 4096 -e 258048 -c 145 -F -x zlib -r ${target_dir} -o ${LICHEE_PLAT_OUT}/rootfs.ubifs
-}
-
-function make_ubuntu()
-{
-	mk_info "pack make_ubuntu ..."
-	#local target_dir
-	if [ ${LICHEE_PLATFORM} = "3rd" ]; then
-		PARTITION_FEX=$LICHEE_BOARD_CONFIG_DIR/systemd/sys_partition.fex
-	else
-		PARTITION_FEX=$LICHEE_BOARD_CONFIG_DIR/longan/sys_partition.fex
-	fi
-    echo "PARTITION_FEX=$PARTITION_FEX"
-    ROOTFS_FEX_LINE=`awk "/rootfs.fex/{print NR}" $PARTITION_FEX`
-    echo "ROOTFS_FEX_LINE=$ROOTFS_FEX_LINE"
-    ROOTFS_FEX_STR=$(awk "NR==$ROOTFS_FEX_LINE-1 {print $1}" $PARTITION_FEX)
-    echo "ROOTFS_FEX_STR=$ROOTFS_FEX_STR"
-    ROOTFS_FEX_SIZE=$(echo $ROOTFS_FEX_STR |  cut -d "=" -f 2)
-    #echo "ROOTFS_FEX_SIZE=$ROOTFS_FEX_SIZE"
-    EXT4_SIZE=$(expr $ROOTFS_FEX_SIZE \* 512)
-    echo "EXT4_SIZE=$EXT4_SIZE(`expr $EXT4_SIZE/1024/1024`)"
-    echo "$PARTITION_FEX rootfs.fex size is $ROOTFS_FEX_SIZE"
-    echo "EXT4_SIZE=$ROOTFS_FEX_SIZE*512=$EXT4_SIZE"
-    $LICHEE_BUILD_DIR/bin/make_ext4fs -s -l $EXT4_SIZE ${LICHEE_PLAT_OUT}/rootfs.ext4  ${LICHEE_TOP_DIR}/buildroot/ubuntu
-	echo "$LICHEE_BUILD_DIR/bin/make_ext4fs -s -l $EXT4_SIZE ${LICHEE_PLAT_OUT}/rootfs.ext4  ${LICHEE_TOP_DIR}/buildroot/ubuntu"
-}
 function pack_rootfs()
 {
 	mk_info "pack rootfs ..."
@@ -1746,85 +1237,29 @@ function pack_rootfs()
 	local INODES=""
 	local BLOCKS=""
 
-	if [ ${LICHEE_PLATFORM} = "3rd" ]; then
-		ROOTFS=${LICHEE_TOP_DIR}/3rd/u_rootfs
-	else
-		ROOTFS=${LICHEE_BR_OUT}/target
-	fi
-
 	mkdir -p ${ROOTFS}/lib/modules
 	cp -rf ${LICHEE_KERN_DIR}/output/lib/modules/* \
 		${ROOTFS}/lib/modules/
 
-	if [ ${LICHEE_PLATFORM} != "3rd" ]; then
-		(cd ${ROOTFS}; ln -fs bin/busybox init)
-	fi
+	(cd ${ROOTFS}; ln -fs bin/busybox init)
 
 	export PATH=$PATH:${LICHEE_BUILD_DIR}/bin
 
-	#fakeroot chown -h -R 0:0 ${ROOTFS}
-	#fakeroot ${LICHEE_BUILD_DIR}/bin/mke2img -d \
-	#${ROOTFS} -G 4 -R 1 -B 0 -I 0 -o ${LICHEE_PLAT_OUT}/rootfs.ext4
-	if [ "x${LICHEE_FLASH}" = "xnor" ]; then
-		echo "skip $LICHEE_PLATFORM_DIR/framework/auto/build.sh for NOR flash"
-	else
-	$LICHEE_PLATFORM_DIR/framework/auto/build.sh
-	fi
-	case ${LICHEE_BOARD} in
-		*nor*)
-			make_squashfs ${ROOTFS}
-			;;
-		*nand*)
-			make_ubifs ${ROOTFS}
-			;;
-		*)
-			if [ "x${LICHEE_FLASH}" = "xnor" ]; then
-				make_squashfs ${ROOTFS}
-			else
-				make_ext4  ${ROOTFS}
-			fi
-			;;
-	esac
-	#fakeroot ${LICHEE_BUILD_DIR}/bin/mksquashfs \
-	#${ROOTFS} ${LICHEE_PLAT_OUT}/rootfs.squashfs -root-owned -no-progress -comp xz -noappend
+	fakeroot chown -h -R 0:0 ${ROOTFS}
+	fakeroot ${LICHEE_BUILD_DIR}/bin/mke2img -d \
+	${ROOTFS} -G 4 -R 1 -B 0 -I 0 -o ${LICHEE_PLAT_OUT}/rootfs.ext4
+	fakeroot ${LICHEE_BUILD_DIR}/bin/mksquashfs \
+	${ROOTFS} ${LICHEE_PLAT_OUT}/rootfs.squashfs -root-owned -no-progress -comp xz -noappend
 
-	#fakeroot ${LICHEE_BUILD_DIR}/bin/mkfs.ubifs \
-	#	-m 4096 -e 258048 -c 145 -F -x zlib -r ${ROOTFS} -o ${LICHEE_PLAT_OUT}/rootfs.ubifs
+	fakeroot ${LICHEE_BUILD_DIR}/bin/mkfs.ubifs \
+		-m 4096 -e 258048 -c 145 -F -x zlib -r ${ROOTFS} -o ${LICHEE_PLAT_OUT}/rootfs.ubifs
 
 	mk_info "pack rootfs ok ..."
 }
-function pack_ubuntufs()
+
+function mkrootfs()
 {
-	mk_info "pack pack_ubuntufs ..."
-	local ROOTFS=${LICHEE_BR_OUT}/target
-	local INODES=""
-	local BLOCKS=""
-	if [ ${LICHEE_PLATFORM} = "3rd" ]; then
-		ROOTFS=${LICHEE_TOP_DIR}/3rd/u_rootfs
-	else
-		ROOTFS=${LICHEE_BR_OUT}/target
-	fi
-	mkdir -p ${ROOTFS}/lib/modules
-	cp -rf ${LICHEE_KERN_DIR}/output/lib/modules/* \
-		${ROOTFS}/lib/modules/
-	if [ ${LICHEE_PLATFORM} != "3rd" ]; then
-		(cd ${ROOTFS}; ln -fs bin/busybox init)
-	fi
-	export PATH=$PATH:${LICHEE_BUILD_DIR}/bin
-	#fakeroot chown -h -R 0:0 ${ROOTFS}
-	#fakeroot ${LICHEE_BUILD_DIR}/bin/mke2img -d \
-	#${ROOTFS} -G 4 -R 1 -B 0 -I 0 -o ${LICHEE_PLAT_OUT}/rootfs.ext4
-	#$LICHEE_PLATFORM_DIR/framework/auto/build.sh
-	make_ubuntu
-	#fakeroot ${LICHEE_BUILD_DIR}/bin/mksquashfs \
-	#${ROOTFS} ${LICHEE_PLAT_OUT}/rootfs.squashfs -root-owned -no-progress -comp xz -noappend
-	#fakeroot ${LICHEE_BUILD_DIR}/bin/mkfs.ubifs \
-	#	-m 4096 -e 258048 -c 145 -F -x zlib -r ${ROOTFS} -o ${LICHEE_PLAT_OUT}/rootfs.ubifs
-	mk_info "pack rootfs ok ..."
-}
-function mkubuntufs()
-{
-	mk_info "====YTR===build rootfs ...${LICHEE_PLATFORM}====== ${LICHEE_LINUX_DEV}====== ${LICHEE_FLASH}"
+	mk_info "build rootfs ..."
 	if [ ${LICHEE_PLATFORM} = "linux" ] ; then
 		case ${LICHEE_LINUX_DEV} in
 			bsp)
@@ -1839,11 +1274,7 @@ function mkubuntufs()
 				fi
 				;;
 			longan)
-				if [ ${LICHEE_FLASH} == "nor" ];then
-					[ ${SKIP_BR} -ne 0 ] && mk_norroot $1
-				else
-					pack_ubuntufs $1
-				fi
+				pack_rootfs $1
 				;;
 			dragonboard)
 				prepare_dragonboard_toolchain
@@ -1872,65 +1303,6 @@ function mkubuntufs()
 				mk_info "skip make rootfs for LICHEE_LINUX_DEV=${LICHEE_LINUX_DEV}"
 				;;
 		esac
-	elif [ ${LICHEE_PLATFORM} = "3rd" ]; then
-		pack_rootfs $1
-	else
-		mk_info "skip make rootfs for ${LICHEE_PLATFORM}"
-	fi
-}
-function mkrootfs()
-{
-	mk_info "build rootfs ..."
-	if [ ${LICHEE_PLATFORM} = "linux" ] ; then
-		case ${LICHEE_LINUX_DEV} in
-			bsp)
-				if [ ${SKIP_BR} -ne 0 ] && [ "x${LICHEE_BUILDING_SYSTEM}" = "x" \
-					-o "x${LICHEE_BR_VER}" = "x" ]; then
-					mk_defroot $1
-				else
-					pack_rootfs $1
-				fi
-				;;
-			sata)
-				local ROOTFS=${LICHEE_PLAT_OUT}/rootfs_def
-				if [ "x$PACK_TINY_ANDROID" = "xtrue" ]; then
-					mk_tinyandroid $1
-				else
-					[ ${SKIP_BR} -ne 0 ] && mk_defroot $1
-				fi
-				;;
-			longan)
-					pack_rootfs $1
-				;;
-			dragonboard)
-				prepare_dragonboard_toolchain
-				if [ -d ${LICHEE_DRAGONBAORD_DIR} ]; then
-					echo "Regenerating dragonboard Rootfs..."
-					(
-					cd ${LICHEE_DRAGONBAORD_DIR}; \
-						if [ ! -d "./rootfs" ]; then \
-							echo "extract dragonboard rootfs.tar.gz"; \
-							tar zxf ./common/rootfs/rootfs.tar.gz; \
-						fi
-					)
-					mkdir -p ${LICHEE_DRAGONBAORD_DIR}/rootfs/lib/modules
-					rm -rf ${LICHEE_DRAGONBAORD_DIR}/rootfs/lib/modules/*
-					cp -rf ${LICHEE_KERN_DIR}/output/lib/modules/* \
-						${LICHEE_DRAGONBAORD_DIR}/rootfs/lib/modules/
-					(cd ${LICHEE_DRAGONBAORD_DIR}/common/scripts; ./build.sh)
-					[  $? -ne 0 ] && mk_error "build rootfs Failed" && return 1
-					cp ${LICHEE_DRAGONBAORD_DIR}/rootfs.ext4 ${LICHEE_PLAT_OUT}
-				else
-					mk_error "no ${LICHEE_PLATFORM} in lichee,please git clone it under lichee"
-					exit 1
-				fi
-				;;
-			*)
-				mk_info "skip make rootfs for LICHEE_LINUX_DEV=${LICHEE_LINUX_DEV}"
-				;;
-		esac
-	elif [ ${LICHEE_PLATFORM} = "3rd" ]; then
-		pack_rootfs $1
 	else
 		mk_info "skip make rootfs for ${LICHEE_PLATFORM}"
 	fi
@@ -2025,12 +1397,6 @@ function mklichee()
 		exit 1
 	fi
 
-	mkbootloader
-	if [ $? -ne 0 ]; then
-		mk_info "mkbootloader failed"
-		exit 1
-	fi
-
 	mkkernel
 	if [ $? -ne 0 ]; then
 		mk_info "mkkernel failed"
@@ -2045,13 +1411,8 @@ function mklichee()
 		fi
 	fi
 
-	if [ "x${LICHEE_FLASH}" == "xnor" ]; then
-		mk_norroot $1
-	elif [ ${LICHEE_BUILD_ROOT} = "ubuntu" ]; then
-	   mkubuntufs $1
-	else
 	mkrootfs $1
-	fi
+
 	[ $? -ne 0 ] && return 1
 
 	mk_info "----------------------------------------"
@@ -2061,7 +1422,6 @@ function mklichee()
 
 function mkclean()
 {
-	clbuildserver
 	clkernel
 	cldragonboard
 	cldtbo
@@ -2098,16 +1458,10 @@ function mkpack()
 	check_env
 
 	local PACK_PLATFORM=$LICHEE_PLATFORM
-	if [ "x${LICHEE_PLATFORM}" != "xandroid" -a \
-	     "x${LICHEE_PLATFORM}" != "x3rd" ]; then
-		PACK_PLATFORM=$LICHEE_LINUX_DEV
-		(cd ${LICHEE_TOP_DIR}/build && \
-		./pack -i ${LICHEE_IC} -c ${LICHEE_CHIP} -p ${PACK_PLATFORM} -b ${LICHEE_BOARD} -k ${LICHEE_KERN_VER} -n ${LICHEE_FLASH} $@)
-	elif [ "x${LICHEE_PLATFORM}" == "x3rd" ]; then
-		PACK_PLATFORM=$LICHEE_LINUX_DEV
-		(cd ${LICHEE_TOP_DIR}/build && \
-		./pack -i ${LICHEE_IC} -c ${LICHEE_CHIP} -p ${PACK_PLATFORM} -b ${LICHEE_BOARD} -k ${LICHEE_KERN_VER} -n ${LICHEE_FLASH} $@)
-	fi
+	[ "x${LICHEE_PLATFORM}" != "xandroid" ] && PACK_PLATFORM=$LICHEE_LINUX_DEV
+
+	(cd ${LICHEE_TOP_DIR}/build && \
+	./pack -i ${LICHEE_IC} -c ${LICHEE_CHIP} -p ${PACK_PLATFORM} -b ${LICHEE_BOARD} -k ${LICHEE_KERN_VER} -n ${LICHEE_FLASH} $@)
 }
 
 function mkhelp()
@@ -2124,7 +1478,6 @@ function mkhelp()
 	mkkernel    build kernel
 	mkrootfs    build rootfs for linux, dragonboard
 	mklichee    build total lichee
-	mkqt        build Qt
 
 	mkclean     clean current board output
 	mkdistclean clean entires output
